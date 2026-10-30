@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="金種チェック">
+<meta name="theme-color" content="#111418">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>C2C 金種チェック</title>
+<style>
+  :root {
+    --bg: #111418; --panel: #1b2027; --line: #2b323c; --text: #f2f4f7; --muted: #8b95a3;
+    --accent: #15c604; --ok: #3ccf8e; --ng: #ff6b6b; --btn: #262d37;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Helvetica Neue", sans-serif;
+    -webkit-user-select: none; user-select: none; }
+  input { -webkit-user-select: text; user-select: text; }
+  body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 12px 14px 0; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0 10px; }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: .02em; }
+  header .date { color: var(--muted); font-size: 13px; }
+  .grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  @media (min-width: 760px) { .grid { grid-template-columns: 1fr 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 6px 12px; }
+  .card h2 { font-size: 13px; color: var(--muted); margin: 8px 2px 4px; font-weight: 600; }
+  .row { display: grid; grid-template-columns: 1fr 96px 110px; align-items: center; gap: 10px;
+    padding: 8px 8px; margin: 0 -8px; border-top: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+  .row:first-of-type { border-top: none; }
+  .row.sel { background: rgba(21,198,4,.14); }
+  .denom { font-weight: 700; font-size: 17px; }
+  .denom small { display: block; font-size: 11px; color: var(--muted); font-weight: 500; }
+  .cnt { height: 44px; border-radius: 10px; border: 1px solid var(--line); background: #0d1014;
+    display: flex; align-items: center; justify-content: flex-end; padding: 0 12px;
+    font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .cnt.empty { color: #4a5360; }
+  .row.sel .cnt { border: 2px solid var(--accent); }
+  .row.sel .cnt::after { content: ''; width: 2px; height: 24px; background: var(--accent); margin-left: 2px;
+    animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .sub { text-align: right; font-variant-numeric: tabular-nums; font-size: 16px; }
+  .sub.zero { color: var(--muted); }
+  .settings { margin-top: 12px; }
+  .field { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0;
+    border-top: 1px solid var(--line); }
+  .field:first-of-type { border-top: none; }
+  .field label { font-size: 15px; }
+  .field input { width: 160px; height: 42px; border-radius: 10px; border: 1px solid var(--line); background: #0d1014;
+    color: var(--text); font-size: 18px; text-align: right; padding: 0 10px; }
+  .actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .actions button, .btn { height: 48px; border-radius: 12px; border: none; font-size: 15px; font-weight: 700;
+    background: var(--btn); color: var(--text); touch-action: manipulation; }
+  .actions .primary { background: var(--accent); color: #062900; }
+  .history { margin-top: 12px; margin-bottom: 16px; }
+  .hitem { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; padding: 10px 2px; border-top: 1px solid var(--line); }
+  .hitem:first-of-type { border-top: none; }
+  .hitem .when { font-size: 14px; }
+  .hitem .amt { font-size: 18px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+  .hitem .detail { grid-column: 1 / -1; font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .hitem .ops { grid-column: 1 / -1; display: flex; gap: 8px; }
+  .hitem .ops button { height: 34px; padding: 0 12px; border-radius: 9px; border: none; background: var(--btn); color: var(--text); font-size: 13px; }
+  .empty-msg { color: var(--muted); font-size: 14px; padding: 12px 2px; }
+
+  /* 下部パネル（合計＋テンキー） */
+  .bottom { position: sticky; bottom: 0; background: rgba(17,20,24,.97);
+    border-top: 1px solid var(--line); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    padding: 8px 14px calc(8px + env(safe-area-inset-bottom)); z-index: 10; }
+  .bottom .in { max-width: 980px; margin: 0 auto; }
+  .tline { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .tlabel { color: var(--muted); font-size: 13px; }
+  .tval { font-size: 36px; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .sline { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-top: 1px;
+    font-variant-numeric: tabular-nums; }
+  .sline b { color: var(--text); font-weight: 600; }
+  .pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
+  .pad.hide { display: none; }
+  .pad button { height: 52px; border-radius: 12px; border: none; background: var(--btn); color: var(--text);
+    font-size: 24px; font-weight: 600; touch-action: manipulation; }
+  .pad button:active { background: #3a4552; }
+  .pad .fn { font-size: 15px; font-weight: 700; color: #c7cfd9; }
+  .pad .next { grid-row: span 2; height: auto; background: var(--accent); color: #062900; font-size: 18px; font-weight: 800; }
+  .pad .next:active { background: #10a003; }
+  .pad .zero { grid-column: span 2; }
+  .padhint { font-size: 12px; color: var(--muted); margin-top: 6px; text-align: center; }
+  @media (min-width: 760px) { .pad { max-width: 520px; margin-left: auto; margin-right: auto; } .pad button { height: 58px; } }
+
+  .toast { position: fixed; left: 50%; top: calc(16px + env(safe-area-inset-top)); transform: translateX(-50%);
+    background: #2a3340; color: var(--text); padding: 10px 16px; border-radius: 999px; font-size: 14px;
+    opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 30; }
+  .toast.show { opacity: 1; }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: center; justify-content: center; z-index: 20; padding: 20px; }
+  .modal.show { display: flex; }
+  .dialog { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px; width: 100%; max-width: 380px; }
+  .dialog p { margin: 0 0 16px; font-size: 16px; line-height: 1.6; white-space: pre-line; }
+  .dialog .dbtns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .dialog .danger { background: var(--ng); color: #fff; }
+  .ok { color: var(--ok) !important; } .ng { color: var(--ng) !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>coast2coast 金種チェック</h1>
+    <span class="date" id="today"></span>
+  </header>
+
+  <div class="grid">
+    <section class="card">
+      <h2>紙幣</h2>
+      <div id="bills"></div>
+    </section>
+    <section class="card">
+      <h2>硬貨</h2>
+      <div id="coins"></div>
+    </section>
+  </div>
+
+  <div class="actions">
+    <button id="btnReset">クリア</button>
+    <button id="btnCopy">合計をコピー</button>
+    <button id="btnSave" class="primary">締めを保存</button>
+  </div>
+
+  <section class="card settings">
+    <h2>照合（任意）</h2>
+    <div class="field">
+      <label>釣銭準備金（固定）</label>
+      <span style="font-size:18px;font-weight:600">¥80,000</span>
+    </div>
+    <div class="field">
+      <label for="expected">Square上の予定現金</label>
+      <input id="expected" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="未入力">
+    </div>
+  </section>
+
+  <section class="card history">
+    <h2>締め履歴（この端末のみ）</h2>
+    <div id="history"></div>
+  </section>
+</div>
+
+<div class="bottom">
+  <div class="in">
+    <div class="tline">
+      <span class="tlabel">現金合計（Squareに入力）</span>
+      <span class="tval" id="total">¥0</span>
+    </div>
+    <div class="sline">
+      <span>準備金差引 <b id="net">¥0</b></span>
+      <span id="diffWrap" style="display:none">過不足 <b id="diff">¥0</b></span>
+      <span>枚数 <b id="pieces">0</b></span>
+    </div>
+    <div class="pad" id="pad">
+      <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button data-k="bs" class="fn">⌫</button>
+      <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button><button data-k="prev" class="fn">▲ 前へ</button>
+      <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button><button data-k="next" class="next" id="nextKey">次へ ▼</button>
+      <button data-k="0" class="zero">0</button><button data-k="c" class="fn">C</button>
+    </div>
+    <div class="padhint" id="padhint" style="display:none">金種の行をタップすると入力できます</div>
+  </div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="dialog">
+    <p id="mText"></p>
+    <div class="dbtns">
+      <button class="btn" id="mCancel">キャンセル</button>
+      <button class="btn danger" id="mOk">OK</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  var DENOMS = [
+    { v: 10000, type: 'bill' }, { v: 5000, type: 'bill' }, { v: 2000, type: 'bill' }, { v: 1000, type: 'bill' },
+    { v: 500, type: 'coin', roll: 50 }, { v: 100, type: 'coin', roll: 50 }, { v: 50, type: 'coin', roll: 50 },
+    { v: 10, type: 'coin', roll: 50 }
+  ];
+  var MAX_DIGITS = 4;
+  var FLOAT = 80000; // 釣銭準備金（毎日固定）
+  var RESET_HOUR = 13; // 毎日この時刻を過ぎたら入力を自動クリア（履歴は残す）
+  var draftAt = Date.now(); // 入力を最後に変更した時刻
+  var KEY_DRAFT = 'c2c-cash-draft-v1', KEY_HIST = 'c2c-cash-history-v1';
+  var counts = {}, rows = {};
+  var sel = -1;       // 選択中の金種インデックス（-1 = なし）
+  var fresh = false;  // 選択直後：最初の数字で上書きする
+  var $ = function (id) { return document.getElementById(id); };
+  var yen = function (n) { return (n < 0 ? '-¥' : '¥') + Math.abs(n).toLocaleString('ja-JP'); };
+  var toInt = function (s) { var n = parseInt(String(s).replace(/[^0-9]/g, ''), 10); return isNaN(n) ? 0 : n; };
+
+  function load(key, fallback) {
+    try { var s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; } catch (e) { return fallback; }
+  }
+  function store(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} }
+
+  function buildRows() {
+    DENOMS.forEach(function (d, i) {
+      counts[d.v] = 0;
+      var row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML =
+        '<div class="denom">' + d.v.toLocaleString('ja-JP') + '円' +
+          (d.roll ? '<small>棒金 ' + d.roll + '枚=' + (d.v * d.roll).toLocaleString('ja-JP') + '円</small>' : '') + '</div>' +
+        '<div class="cnt empty">0</div>' +
+        '<div class="sub zero">¥0</div>';
+      row.addEventListener('click', function () { select(i); });
+      rows[d.v] = row;
+      $(d.type === 'bill' ? 'bills' : 'coins').appendChild(row);
+    });
+  }
+
+  // ---- 選択とテンキー ----
+  function select(i) {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    sel = i; fresh = true;
+    DENOMS.forEach(function (d, j) { rows[d.v].classList.toggle('sel', j === i); });
+    $('nextKey').textContent = i === DENOMS.length - 1 ? '完了' : '次へ ▼';
+    $('pad').classList.toggle('hide', i < 0);
+    $('padhint').style.display = i < 0 ? '' : 'none';
+    if (i >= 0) rows[DENOMS[i].v].scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+
+  function press(k) {
+    if (sel < 0) return;
+    var v = DENOMS[sel].v;
+    var s = counts[v] ? String(counts[v]) : '';
+    if (/^[0-9]$/.test(k)) {
+      if (fresh) s = '';
+      if (s.length < MAX_DIGITS) s += k;
+      fresh = false;
+    } else if (k === 'bs') { s = s.slice(0, -1); fresh = false; }
+    else if (k === 'c') { s = ''; fresh = false; }
+    else if (k === 'next') { select(sel < DENOMS.length - 1 ? sel + 1 : -1); return; }
+    else if (k === 'prev') { if (sel > 0) select(sel - 1); return; }
+    counts[v] = toInt(s);
+    render();
+  }
+
+  $('pad').querySelectorAll('button').forEach(function (b) {
+    b.addEventListener('click', function () { press(b.dataset.k); });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (sel < 0 || e.target.tagName === 'INPUT') return;
+    if (/^[0-9]$/.test(e.key)) press(e.key);
+    else if (e.key === 'Backspace') press('bs');
+    else if (e.key === 'Enter' || e.key === 'Tab' || e.key === 'ArrowDown') { e.preventDefault(); press('next'); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); press('prev'); }
+  });
+
+  function calc() {
+    var total = 0, pieces = 0;
+    DENOMS.forEach(function (d) { total += d.v * counts[d.v]; pieces += counts[d.v]; });
+    return { total: total, pieces: pieces };
+  }
+
+  function render() {
+    DENOMS.forEach(function (d) {
+      var row = rows[d.v], n = counts[d.v], s = d.v * n;
+      var cnt = row.querySelector('.cnt');
+      cnt.textContent = String(n);
+      cnt.classList.toggle('empty', n === 0);
+      var sub = row.querySelector('.sub');
+      sub.textContent = yen(s);
+      sub.classList.toggle('zero', s === 0);
+    });
+    var c = calc();
+    var fl = FLOAT;
+    $('total').textContent = yen(c.total);
+    $('net').textContent = yen(c.total - fl);
+    $('pieces').textContent = c.pieces.toLocaleString('ja-JP');
+    var expRaw = $('expected').value.trim();
+    if (expRaw !== '') {
+      var diff = c.total - toInt(expRaw);
+      $('diffWrap').style.display = '';
+      $('diff').textContent = (diff > 0 ? '+' : '') + yen(diff);
+      $('diff').className = diff === 0 ? 'ok' : 'ng';
+    } else {
+      $('diffWrap').style.display = 'none';
+    }
+    draftAt = Date.now();
+    store(KEY_DRAFT, { counts: counts, expected: expRaw, at: draftAt });
+  }
+
+  // 直近の「リセット時刻」（今日13:00、まだ13時前なら昨日13:00）
+  function lastResetTime() {
+    var d = new Date(); d.setHours(RESET_HOUR, 0, 0, 0);
+    if (Date.now() < d.getTime()) d.setDate(d.getDate() - 1);
+    return d.getTime();
+  }
+  function autoReset() {
+    if (draftAt >= lastResetTime()) return false;
+    var has = $('expected').value !== '' || DENOMS.some(function (d) { return counts[d.v]; });
+    DENOMS.forEach(function (d) { counts[d.v] = 0; });
+    $('expected').value = '';
+    render();
+    if (has) { select(0); toast('新しい営業日のため入力をリセットしました'); }
+    return true;
+  }
+  setInterval(autoReset, 60 * 1000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) autoReset(); });
+
+  // ---- 履歴 ----
+  function renderHistory() {
+    var list = load(KEY_HIST, []);
+    var box = $('history');
+    box.innerHTML = '';
+    if (!list.length) { box.innerHTML = '<div class="empty-msg">まだ保存された締めはありません</div>'; return; }
+    list.forEach(function (h, idx) {
+      var el = document.createElement('div');
+      el.className = 'hitem';
+      var detail = DENOMS.filter(function (d) { return h.counts[d.v]; })
+        .map(function (d) { return d.v.toLocaleString('ja-JP') + '円×' + h.counts[d.v]; }).join('　');
+      var extra = '準備金 ' + yen(h.float) + ' / 差引 ' + yen(h.total - h.float) +
+        (h.expected !== null && h.expected !== undefined ? ' / 過不足 ' + (h.total - h.expected > 0 ? '+' : '') + yen(h.total - h.expected) : '');
+      el.innerHTML =
+        '<div class="when">' + fmtDate(new Date(h.at)) + '</div>' +
+        '<div class="amt">' + yen(h.total) + '</div>' +
+        '<div class="detail">' + (detail || '—') + '<br>' + extra + '</div>' +
+        '<div class="ops"><button type="button" data-a="load">呼び出す</button><button type="button" data-a="del">削除</button></div>';
+      el.querySelector('[data-a="load"]').addEventListener('click', function () {
+        ask('この締めの枚数を入力欄に読み込みますか？\n（いまの入力は上書きされます）', function () {
+          DENOMS.forEach(function (d) { counts[d.v] = toInt(h.counts[d.v]); });
+          render(); select(0);
+          toast('読み込みました');
+        }, '読み込む');
+      });
+      el.querySelector('[data-a="del"]').addEventListener('click', function () {
+        ask(fmtDate(new Date(h.at)) + ' ' + yen(h.total) + '\nこの履歴を削除しますか？', function () {
+          var l = load(KEY_HIST, []); l.splice(idx, 1); store(KEY_HIST, l); renderHistory(); toast('削除しました');
+        }, '削除');
+      });
+      box.appendChild(el);
+    });
+  }
+
+  function escapeHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function fmtDate(d) {
+    var w = '日月火水木金土'[d.getDay()];
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '/' + p(d.getMonth() + 1) + '/' + p(d.getDate()) + '(' + w + ') ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  // ---- ダイアログ・トースト ----
+  var pending = null;
+  function ask(text, onOk, okLabel) {
+    $('mText').textContent = text; $('mOk').textContent = okLabel || 'OK';
+    pending = onOk; $('modal').classList.add('show');
+  }
+  $('mCancel').addEventListener('click', function () { $('modal').classList.remove('show'); pending = null; });
+  $('mOk').addEventListener('click', function () { $('modal').classList.remove('show'); var f = pending; pending = null; if (f) f(); });
+  var tt;
+  function toast(msg) { var t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(function () { t.classList.remove('show'); }, 1600); }
+
+  // ---- ボタン ----
+  $('btnReset').addEventListener('click', function () {
+    ask('入力した枚数をすべて0に戻しますか？', function () {
+      DENOMS.forEach(function (d) { counts[d.v] = 0; });
+      $('expected').value = ''; render(); select(0); toast('クリアしました');
+    }, 'クリア');
+  });
+  $('btnCopy').addEventListener('click', function () {
+    var s = String(calc().total);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(s).then(function () { toast('コピーしました：' + yen(+s)); }, function () { toast('コピーできませんでした'); });
+    } else { toast('コピーできませんでした'); }
+  });
+  $('btnSave').addEventListener('click', function () {
+    var c = calc();
+    if (!c.total) { toast('枚数が入力されていません'); return; }
+    ask('現金合計 ' + yen(c.total) + ' で締めを保存しますか？', function () {
+      var expRaw = $('expected').value.trim();
+      var rec = { at: Date.now(), counts: JSON.parse(JSON.stringify(counts)), total: c.total,
+        float: FLOAT, expected: expRaw === '' ? null : toInt(expRaw) };
+      var list = load(KEY_HIST, []); list.unshift(rec); store(KEY_HIST, list.slice(0, 60));
+      renderHistory(); toast('保存しました');
+    }, '保存');
+  });
+
+  $('expected').addEventListener('focus', function () { select(-1); });
+  $('expected').addEventListener('input', function () {
+    var n = $('expected').value.replace(/[^0-9]/g, ''); if ($('expected').value !== n) $('expected').value = n;
+    render();
+  });
+
+  // ---- 初期化 ----
+  buildRows();
+  var draft = load(KEY_DRAFT, null);
+  if (draft && draft.counts) {
+    DENOMS.forEach(function (d) { counts[d.v] = toInt(draft.counts[d.v]); });
+    if (draft.expected) $('expected').value = draft.expected;
+    if (draft.at) draftAt = draft.at;
+  }
+  if (!autoReset()) render();
+  renderHistory();
+  $('today').textContent = fmtDate(new Date()).slice(0, 15);
+  sel = 0; fresh = true;
+  rows[DENOMS[0].v].classList.add('sel');
+})();
+</script>
+</body>
+</html>

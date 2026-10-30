@@ -18,9 +18,9 @@
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; background: var(--bg); color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Helvetica Neue", sans-serif;
-    -webkit-user-select: none; user-select: none; }
-  input { -webkit-user-select: text; user-select: text; }
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Helvetica Neue", sans-serif; }
+  /* iOS では祖先に user-select:none があると入力欄が触れなくなるため、ボタン類だけに限定 */
+  button, .row, .pad, .bottom .tline, .bottom .sline { -webkit-user-select: none; user-select: none; }
   body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
   .wrap { max-width: 980px; margin: 0 auto; padding: 12px 14px 0; }
   header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0 10px; }
@@ -107,7 +107,7 @@
 <div class="wrap">
   <header>
     <h1>coast2coast 金種チェック</h1>
-    <span class="date" id="today"></span>
+    <span class="date"><span id="today"></span> ・ v1.2</span>
   </header>
 
   <div class="grid">

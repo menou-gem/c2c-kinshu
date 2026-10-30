@@ -219,7 +219,7 @@
 
   // ---- 選択とテンキー ----
   function select(i) {
-    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    if (i >= 0 && document.activeElement && document.activeElement.blur) document.activeElement.blur();
     sel = i; fresh = true;
     DENOMS.forEach(function (d, j) { rows[d.v].classList.toggle('sel', j === i); });
     $('nextKey').textContent = i === DENOMS.length - 1 ? '完了' : '次へ ▼';

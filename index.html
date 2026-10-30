@@ -34,6 +34,7 @@
     padding: 8px 8px; margin: 0 -8px; border-top: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
   .row:first-of-type { border-top: none; }
   .row.sel { background: rgba(21,198,4,.14); }
+  .row.exp { grid-template-columns: 1fr 170px; border-top: 1px solid var(--line); }
   .denom { font-weight: 700; font-size: 17px; }
   .denom small { display: block; font-size: 11px; color: var(--muted); font-weight: 500; }
   .cnt { height: 44px; border-radius: 10px; border: 1px solid var(--line); background: #0d1014;
@@ -107,7 +108,7 @@
 <div class="wrap">
   <header>
     <h1>coast2coast 金種チェック</h1>
-    <span class="date"><span id="today"></span> ・ v1.2</span>
+    <span class="date"><span id="today"></span> ・ v1.3</span>
   </header>
 
   <div class="grid">
@@ -133,9 +134,9 @@
       <label>釣銭準備金（固定）</label>
       <span style="font-size:18px;font-weight:600">¥80,000</span>
     </div>
-    <div class="field">
-      <label for="expected">Square上の予定現金</label>
-      <input id="expected" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="未入力">
+    <div class="row exp" id="expRow">
+      <div class="denom">Square上の予定現金<small>タップしてテンキーで入力</small></div>
+      <div class="cnt empty" id="expected">未入力</div>
     </div>
   </section>
 
@@ -190,7 +191,9 @@
   var draftAt = Date.now(); // 入力を最後に変更した時刻
   var KEY_DRAFT = 'c2c-cash-draft-v1', KEY_HIST = 'c2c-cash-history-v1';
   var counts = {}, rows = {};
-  var sel = -1;       // 選択中の金種インデックス（-1 = なし）
+  var expected = '';  // Square上の予定現金（未入力は空文字）
+  var EXP = DENOMS.length, EXP_DIGITS = 8; // 予定現金は金種の次（最後）の入力欄
+  var sel = -1;       // 選択中のインデックス（0..EXP、-1 = なし）
   var fresh = false;  // 選択直後：最初の数字で上書きする
   var $ = function (id) { return document.getElementById(id); };
   var yen = function (n) { return (n < 0 ? '-¥' : '¥') + Math.abs(n).toLocaleString('ja-JP'); };
@@ -218,29 +221,31 @@
   }
 
   // ---- 選択とテンキー ----
+  function rowAt(i) { return i === EXP ? $('expRow') : rows[DENOMS[i].v]; }
+
   function select(i) {
     if (i >= 0 && document.activeElement && document.activeElement.blur) document.activeElement.blur();
     sel = i; fresh = true;
-    DENOMS.forEach(function (d, j) { rows[d.v].classList.toggle('sel', j === i); });
-    $('nextKey').textContent = i === DENOMS.length - 1 ? '完了' : '次へ ▼';
+    for (var j = 0; j <= EXP; j++) rowAt(j).classList.toggle('sel', j === i);
+    $('nextKey').textContent = i === EXP ? '完了' : '次へ ▼';
     $('pad').classList.toggle('hide', i < 0);
     $('padhint').style.display = i < 0 ? '' : 'none';
-    if (i >= 0) rows[DENOMS[i].v].scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (i >= 0) rowAt(i).scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
 
   function press(k) {
     if (sel < 0) return;
-    var v = DENOMS[sel].v;
-    var s = counts[v] ? String(counts[v]) : '';
+    if (k === 'next') { select(sel < EXP ? sel + 1 : -1); return; }
+    if (k === 'prev') { if (sel > 0) select(sel - 1); return; }
+    var isExp = sel === EXP;
+    var s = isExp ? expected : (counts[DENOMS[sel].v] ? String(counts[DENOMS[sel].v]) : '');
     if (/^[0-9]$/.test(k)) {
       if (fresh) s = '';
-      if (s.length < MAX_DIGITS) s += k;
+      if (s.length < (isExp ? EXP_DIGITS : MAX_DIGITS) && !(s === '' && k === '0' && isExp)) s += k;
       fresh = false;
     } else if (k === 'bs') { s = s.slice(0, -1); fresh = false; }
     else if (k === 'c') { s = ''; fresh = false; }
-    else if (k === 'next') { select(sel < DENOMS.length - 1 ? sel + 1 : -1); return; }
-    else if (k === 'prev') { if (sel > 0) select(sel - 1); return; }
-    counts[v] = toInt(s);
+    if (isExp) expected = s; else counts[DENOMS[sel].v] = toInt(s);
     render();
   }
 
@@ -276,7 +281,9 @@
     $('total').textContent = yen(c.total);
     $('net').textContent = yen(c.total - fl);
     $('pieces').textContent = c.pieces.toLocaleString('ja-JP');
-    var expRaw = $('expected').value.trim();
+    var expRaw = expected;
+    $('expected').textContent = expRaw === '' ? '未入力' : yen(toInt(expRaw));
+    $('expected').classList.toggle('empty', expRaw === '');
     if (expRaw !== '') {
       var diff = c.total - toInt(expRaw);
       $('diffWrap').style.display = '';
@@ -297,9 +304,9 @@
   }
   function autoReset() {
     if (draftAt >= lastResetTime()) return false;
-    var has = $('expected').value !== '' || DENOMS.some(function (d) { return counts[d.v]; });
+    var has = expected !== '' || DENOMS.some(function (d) { return counts[d.v]; });
     DENOMS.forEach(function (d) { counts[d.v] = 0; });
-    $('expected').value = '';
+    expected = '';
     render();
     if (has) { select(0); toast('新しい営業日のため入力をリセットしました'); }
     return true;
@@ -363,7 +370,7 @@
   $('btnReset').addEventListener('click', function () {
     ask('入力した枚数をすべて0に戻しますか？', function () {
       DENOMS.forEach(function (d) { counts[d.v] = 0; });
-      $('expected').value = ''; render(); select(0); toast('クリアしました');
+      expected = ''; render(); select(0); toast('クリアしました');
     }, 'クリア');
   });
   $('btnCopy').addEventListener('click', function () {
@@ -376,7 +383,7 @@
     var c = calc();
     if (!c.total) { toast('枚数が入力されていません'); return; }
     ask('現金合計 ' + yen(c.total) + ' で締めを保存しますか？', function () {
-      var expRaw = $('expected').value.trim();
+      var expRaw = expected;
       var rec = { at: Date.now(), counts: JSON.parse(JSON.stringify(counts)), total: c.total,
         float: FLOAT, expected: expRaw === '' ? null : toInt(expRaw) };
       var list = load(KEY_HIST, []); list.unshift(rec); store(KEY_HIST, list.slice(0, 60));
@@ -384,18 +391,14 @@
     }, '保存');
   });
 
-  $('expected').addEventListener('focus', function () { select(-1); });
-  $('expected').addEventListener('input', function () {
-    var n = $('expected').value.replace(/[^0-9]/g, ''); if ($('expected').value !== n) $('expected').value = n;
-    render();
-  });
+  $('expRow').addEventListener('click', function () { select(EXP); });
 
   // ---- 初期化 ----
   buildRows();
   var draft = load(KEY_DRAFT, null);
   if (draft && draft.counts) {
     DENOMS.forEach(function (d) { counts[d.v] = toInt(draft.counts[d.v]); });
-    if (draft.expected) $('expected').value = draft.expected;
+    if (draft.expected) expected = String(toInt(draft.expected));
     if (draft.at) draftAt = draft.at;
   }
   if (!autoReset()) render();
